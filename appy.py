@@ -33,14 +33,11 @@ with st.container(border=True):
     volumen_cm3 = 0.0
     error_espesor = False
     
-    # Si la pieza NO es irregular, preguntamos la forma geométrica
     if tipo_pieza != "Molde Irregular (Cálculo por agua)":
         forma = st.selectbox("Forma visual de la pieza:", ["Cilíndrica / Redonda", "Cuadrada / Rectangular"])
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # CASO A: PIEZAS CILÍNDRICAS / REDONDAS
         if forma == "Cilíndrica / Redonda":
-            # Si tiene hueco (Maceta o Bacha) pedimos espesor
             if tipo_pieza in ["Maceta / Contenedor (Tiene hueco)", "Bacha de baño (Tiene hueco)"]:
                 col_di, col_al, col_es = st.columns(3)
                 with col_di:
@@ -58,7 +55,6 @@ with st.container(border=True):
                     vol_int = math.pi * (((diametro_ext / 2) - espesor) ** 2) * (alto_ext - espesor)
                     volumen_cm3 = vol_ext - vol_int
             else:
-                # Si es macizo o plano (Bandeja, plato, bloque redondo)
                 col_di, col_al = st.columns(2)
                 with col_di:
                     diametro_ext = st.number_input("Diámetro total (cm):", min_value=0.1, value=10.0, step=0.5)
@@ -66,9 +62,7 @@ with st.container(border=True):
                     alto_ext = st.number_input("Alto / Espesor total (cm):", min_value=0.1, value=2.0, step=0.5)
                 volumen_cm3 = math.pi * ((diametro_ext / 2) ** 2) * alto_ext
 
-        # CASO B: PIEZAS CUADRADAS / RECTANGULARES
         elif forma == "Cuadrada / Rectangular":
-            # Si tiene hueco (Maceta o Bacha)
             if tipo_pieza in ["Maceta / Contenedor (Tiene hueco)", "Bacha de baño (Tiene hueco)"]:
                 col_la, col_an, col_al, col_es = st.columns(4)
                 with col_la:
@@ -88,7 +82,6 @@ with st.container(border=True):
                     vol_int = (largo_ext - (espesor * 2)) * (ancho_ext - (espesor * 2)) * (alto_ext - espesor)
                     volumen_cm3 = vol_ext - vol_int
             else:
-                # Si es macizo o plano (Bandeja, plato o bloque cuadrado)
                 col_la, col_an, col_al = st.columns(3)
                 with col_la:
                     largo_ext = st.number_input("Largo (cm):", min_value=0.1, value=10.0, step=0.5)
@@ -97,10 +90,7 @@ with st.container(border=True):
                 with col_al:
                     alto_ext = st.number_input("Alto / Espesor (cm):", min_value=0.1, value=2.0, step=0.5)
                 volumen_cm3 = largo_ext * ancho_ext * alto_ext
-
-    # CASO C: MOLDE IRREGULAR POR AGUA
     else:
-        st.info("💡 Tip de Cota: Llená el molde con agua, volcá esa agua en tu balanza digital e ingresá abajo los gramos o mililitros (ml) que pesó.")
         agua_ml = st.number_input("Cantidad de agua que entró (ml o gramos):", min_value=0.0, value=250.0, step=10.0)
         volumen_cm3 = agua_ml
 
@@ -111,17 +101,22 @@ if st.button("CALCULAR RECETA EXACTA ⚖️"):
     elif volumen_cm3 <= 0:
         st.warning("⚠️ Por favor, ingresá medidas válidas mayores a cero.")
     else:
-        # Densidad promedio (2.2) + 10% de margen de desperdicio técnico del taller
-        mezcla_total_gramos = (volumen_cm3 * 2.2) * 1.10
+        # Ajustamos la densidad total del bloque según la técnica elegida
+        if tecnica == "Concreto Tradicional (1:1)":
+            densidad_mezcla = 2.1
+        else:
+            densidad_mezcla = 2.4 # El terrazo real con piedra es mucho más denso y pesado
+            
+        mezcla_total_gramos = (volumen_cm3 * densidad_mezcla) * 1.10
         
         st.markdown("---")
         st.markdown('<div class="output-box">', unsafe_allow_html=True)
         st.markdown(f"### 📋 Receta de Mezcla para tu {tipo_pieza}")
-        st.write(f"Volumen neto de material: **{volumen_cm3:.1f} cm³**")
         st.write(f"Peso total estimado de mezcla lista (con 10% de margen): **{int(mezcla_total_gramos)} gramos**")
         st.markdown("<br>", unsafe_allow_html=True)
         
         if tecnica == "Concreto Tradicional (1:1)":
+            # Relación de peso equilibrada 1:1 polvo + agua (35%)
             peso_seco_total = mezcla_total_gramos / 1.175
             cemento = peso_seco_total / 2
             marmolina = peso_seco_total / 2
@@ -133,12 +128,18 @@ if st.button("CALCULAR RECETA EXACTA ⚖️"):
             col_r3.metric("💧 Agua", f"{int(agua)} g")
             
         else:
-            # Terrazzo Premium (1:1:1)
-            peso_seco_total = mezcla_total_gramos / 1.116
-            cemento = peso_seco_total / 3
-            marmolina = peso_seco_total / 3
-            piedras = peso_seco_total / 3
-            agua = cemento * 0.35
+            # TERRAZZO REAL (Equivalencia de volumen 1:1:1 pasada a gramos en balanza)
+            # Si un vasito de cemento pesa X, la marmolina pesa X y la piedra pesa 2X.
+            # Total de partes en peso = 1 + 1 + 2 = 4 partes.
+            peso_seco_total = mezcla_total_gramos / 1.087 # Factor que equilibra el agua total
+            
+            partes_peso_total = 4.0
+            unidad_gramos = peso_seco_total / partes_peso_total
+            
+            cemento = unidad_gramos * 1.0       # 1 parte de peso
+            marmolina = unidad_gramos * 1.0     # 1 parte de peso
+            piedras = unidad_gramos * 2.0       # 2 partes de peso (pesa el doble para llenar el mismo vaso)
+            agua = cemento * 0.35               # Agua en base al cemento activo
             
             col_r1, col_r2, col_r3 = st.columns(3)
             col_r1.metric("🧱 Cemento", f"{int(cemento)} g")
@@ -146,6 +147,6 @@ if st.button("CALCULAR RECETA EXACTA ⚖️"):
             col_r3.metric("💧 Agua", f"{int(agua)} g")
             
             st.markdown("<br>", unsafe_allow_html=True)
-            st.metric("🪨 Piedras / Chips", f"{int(piedras)} g")
+            st.metric("🪨 Piedras / Chips (Equivalente en volumen)", f"{int(piedras)} g")
             
         st.markdown("</div>", unsafe_allow_html=True)
